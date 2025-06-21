@@ -134,6 +134,113 @@ async function getAIResponse(history) {
   }
 }
 
+// This function generates recommendations for cheaper alternatives
+async function generateRecommendations(product) {
+  if (!API_KEY || API_KEY === "YOUR_GROQ_API_KEY_HERE") {
+    return [
+      {
+        title: "Generic Alternative",
+        description: "Consider looking for a generic or store-brand version of this item.",
+        price: "Lower price",
+        savings: "Varies"
+      },
+      {
+        title: "Wait for Sale",
+        description: "This item might go on sale soon. Consider waiting or setting up price alerts.",
+        price: "Sale price",
+        savings: "20-50%"
+      },
+      {
+        title: "Check Other Stores",
+        description: "Compare prices at other retailers like Walmart, Target, or local stores.",
+        price: "Varies",
+        savings: "10-30%"
+      }
+    ];
+  }
+  
+  const prompt = `A user is considering buying "${product.name}" for ${product.price}. Generate 3-4 specific, actionable recommendations for cheaper alternatives or money-saving strategies. 
+
+For each recommendation, provide:
+1. A specific title (e.g., "Generic Brand Alternative", "Wait for Black Friday Sale")
+2. A brief description explaining the recommendation
+3. Estimated price or savings
+4. Any specific actions they can take
+
+Focus on practical, realistic alternatives that would actually save money. Be specific and actionable.
+
+Format your response as a JSON array with objects containing: title, description, price, savings (optional), link (optional).`;
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Groq API Error:", response.status, response.statusText);
+      return getDefaultRecommendations();
+    }
+
+    const data = await response.json();
+    const recommendationsText = data.choices[0].message.content.trim();
+    
+    try {
+      // Try to parse JSON from the response
+      const recommendations = JSON.parse(recommendationsText);
+      console.log("Generated recommendations:", recommendations);
+      return recommendations;
+    } catch (parseError) {
+      console.error("Error parsing recommendations JSON:", parseError);
+      console.log("Raw response:", recommendationsText);
+      return getDefaultRecommendations();
+    }
+
+  } catch (error) {
+    console.error("Error calling Groq API for recommendations:", error);
+    return getDefaultRecommendations();
+  }
+}
+
+// Default recommendations when API fails
+function getDefaultRecommendations() {
+  return [
+    {
+      title: "Generic Brand Alternative",
+      description: "Look for a store-brand or generic version of this item. They often have the same quality at a fraction of the price.",
+      price: "30-50% less",
+      savings: "Significant savings"
+    },
+    {
+      title: "Wait for Sales",
+      description: "This item will likely go on sale. Set up price alerts or wait for seasonal sales like Black Friday.",
+      price: "Sale price",
+      savings: "20-40%"
+    },
+    {
+      title: "Check Other Retailers",
+      description: "Compare prices at Walmart, Target, Costco, or local stores. You might find the same item cheaper elsewhere.",
+      price: "Varies",
+      savings: "10-25%"
+    },
+    {
+      title: "Consider Used/Refurbished",
+      description: "For electronics and some items, consider buying used or refurbished. Many come with warranties.",
+      price: "40-60% less",
+      savings: "Major savings"
+    }
+  ];
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const tabId = sender.tab.id;
 
@@ -202,6 +309,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log(`User has met the required ${convo.requiredTurns} turns. Unlocking button.`);
         chrome.tabs.sendMessage(tabId, { type: "UNLOCK_PROCEED" });
       }
+    })();
+    return true; // Indicate async response.
+  }
+
+  if (request.type === "GET_RECOMMENDATIONS") {
+    (async () => {
+      console.log("Background: Generating recommendations for:", request.product.name);
+      const recommendations = await generateRecommendations(request.product);
+      sendResponse({ recommendations: recommendations });
     })();
     return true; // Indicate async response.
   }

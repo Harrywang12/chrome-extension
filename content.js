@@ -575,6 +575,23 @@ function showAIPopup(product, initialArgument) {
     </div>
   `;
 
+  // Create the side panel for recommendations
+  const sidePanel = document.createElement('div');
+  sidePanel.id = 'impulse-control-side-panel';
+  sidePanel.innerHTML = `
+    <div id="side-panel-header">
+      <h3>💡 Better Alternatives</h3>
+      <button id="side-panel-close-btn">&times;</button>
+    </div>
+    <div id="side-panel-content">
+      <div id="recommendations-loading">
+        <div class="loading-spinner"></div>
+        <p>Finding better alternatives...</p>
+      </div>
+      <div id="recommendations-list" style="display: none;"></div>
+    </div>
+  `;
+
   const style = document.createElement('style');
   style.innerHTML = `
     #impulse-control-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; max-width: 90vw; background-color: white; border: 1px solid #ccc; box-shadow: 0 5px 15px rgba(0,0,0,0.3); border-radius: 8px; z-index: 10000; font-family: sans-serif; display: flex; flex-direction: column; height: 500px; }
@@ -602,16 +619,149 @@ function showAIPopup(product, initialArgument) {
     #impulse-control-cancel-btn { background-color: #dc3545; color: white; }
     #impulse-control-proceed-btn { background-color: #28a745; color: white; }
     #impulse-control-proceed-btn:disabled { background-color: #6c757d; cursor: not-allowed; }
+
+    /* Side Panel Styles */
+    #impulse-control-side-panel { 
+      position: fixed; 
+      top: 0; 
+      right: -400px; 
+      width: 400px; 
+      height: 100vh; 
+      background-color: white; 
+      box-shadow: -5px 0 15px rgba(0,0,0,0.3); 
+      z-index: 10001; 
+      font-family: sans-serif; 
+      display: flex; 
+      flex-direction: column; 
+      transition: right 0.3s ease;
+    }
+    
+    #impulse-control-side-panel.show { right: 0; }
+    
+    #side-panel-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid #eee; 
+      padding: 15px 20px; 
+      flex-shrink: 0; 
+      background-color: #f8f9fa;
+    }
+    
+    #side-panel-header h3 { 
+      margin: 0; 
+      font-size: 1.1rem; 
+      color: #333;
+    }
+    
+    #side-panel-close-btn { 
+      border: none; 
+      background: transparent; 
+      font-size: 1.5rem; 
+      cursor: pointer; 
+      color: #666;
+    }
+    
+    #side-panel-content { 
+      flex-grow: 1; 
+      padding: 20px; 
+      overflow-y: auto;
+    }
+    
+    #recommendations-loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .recommendation-item {
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      transition: all 0.2s ease;
+    }
+    
+    .recommendation-item:hover {
+      background-color: #e9ecef;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .recommendation-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+    
+    .recommendation-description {
+      color: #666;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    
+    .recommendation-price {
+      color: #28a745;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    
+    .recommendation-savings {
+      color: #dc3545;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+    
+    .recommendation-link {
+      display: inline-block;
+      background-color: #007bff;
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      transition: background-color 0.2s ease;
+    }
+    
+    .recommendation-link:hover {
+      background-color: #0056b3;
+    }
   `;
 
   document.head.appendChild(style);
   document.body.appendChild(popup);
+  document.body.appendChild(sidePanel);
+
+  // Show the side panel with animation
+  setTimeout(() => {
+    sidePanel.classList.add('show');
+  }, 100);
 
   const chatArea = document.getElementById('ai-chat-area');
   const chatForm = document.getElementById('impulse-control-chat-form');
   const chatInput = document.getElementById('impulse-control-chat-input');
   const proceedBtn = document.getElementById('impulse-control-proceed-btn');
   const cancelBtn = document.getElementById('impulse-control-cancel-btn');
+  const sidePanelCloseBtn = document.getElementById('side-panel-close-btn');
 
   function appendMessage(text, sender) {
     const messageDiv = document.createElement('div');
@@ -623,9 +773,13 @@ function showAIPopup(product, initialArgument) {
   
   function closePopup() {
     popup.remove();
+    sidePanel.remove();
     style.remove();
     overlay.remove();
   }
+
+  // Load recommendations
+  loadRecommendations(product);
 
   // Display initial argument
   appendMessage(`Regarding ${product.name} for ${product.price}: ${initialArgument}`, 'ai');
@@ -653,6 +807,12 @@ function showAIPopup(product, initialArgument) {
 
   document.getElementById('impulse-control-close-btn').addEventListener('click', closePopup);
   cancelBtn.addEventListener('click', closePopup);
+  sidePanelCloseBtn.addEventListener('click', () => {
+    sidePanel.classList.remove('show');
+    setTimeout(() => {
+      sidePanel.remove();
+    }, 300);
+  });
 
   proceedBtn.addEventListener('click', async () => {
     closePopup();
@@ -903,4 +1063,77 @@ function extractCoreProductName(fullName) {
   
   console.log("Cleaned product name:", cleanedName);
   return cleanedName;
+}
+
+// Function to load recommendations from the background script
+async function loadRecommendations(product) {
+  try {
+    console.log("Loading recommendations for:", product.name);
+    
+    // Send request to background script for recommendations
+    chrome.runtime.sendMessage({ 
+      type: "GET_RECOMMENDATIONS", 
+      product: product 
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error getting recommendations:", chrome.runtime.lastError);
+        showRecommendationsError();
+        return;
+      }
+      
+      if (response && response.recommendations) {
+        displayRecommendations(response.recommendations);
+      } else {
+        showRecommendationsError();
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error loading recommendations:", error);
+    showRecommendationsError();
+  }
+}
+
+// Function to display recommendations in the side panel
+function displayRecommendations(recommendations) {
+  const loadingDiv = document.getElementById('recommendations-loading');
+  const listDiv = document.getElementById('recommendations-list');
+  
+  if (loadingDiv) loadingDiv.style.display = 'none';
+  if (listDiv) {
+    listDiv.style.display = 'block';
+    listDiv.innerHTML = '';
+    
+    recommendations.forEach((rec, index) => {
+      const recItem = document.createElement('div');
+      recItem.className = 'recommendation-item';
+      recItem.innerHTML = `
+        <div class="recommendation-title">${rec.title}</div>
+        <div class="recommendation-description">${rec.description}</div>
+        <div class="recommendation-price">${rec.price}</div>
+        ${rec.savings ? `<div class="recommendation-savings">Save ${rec.savings}</div>` : ''}
+        ${rec.link ? `<a href="${rec.link}" class="recommendation-link" target="_blank">View Alternative</a>` : ''}
+      `;
+      listDiv.appendChild(recItem);
+    });
+  }
+}
+
+// Function to show error state for recommendations
+function showRecommendationsError() {
+  const loadingDiv = document.getElementById('recommendations-loading');
+  const listDiv = document.getElementById('recommendations-list');
+  
+  if (loadingDiv) loadingDiv.style.display = 'none';
+  if (listDiv) {
+    listDiv.style.display = 'block';
+    listDiv.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: #666;">
+        <p>Unable to load recommendations at this time.</p>
+        <p style="font-size: 0.9rem; margin-top: 10px;">
+          Consider searching for similar items with lower prices or checking for sales and discounts.
+        </p>
+      </div>
+    `;
+  }
 } 
