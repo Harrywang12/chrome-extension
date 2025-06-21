@@ -1,0 +1,2 @@
+# Ignore configuration files containing sensitive information
+config.js 
