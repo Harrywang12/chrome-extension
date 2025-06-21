@@ -1,5 +1,237 @@
 console.log("Content script loaded.");
 
+let originalAddToCartButton = null;
+let isProceedingWithPurchase = false;
+
+// Add mousedown listener to catch events even earlier
+document.addEventListener('mousedown', function(event) {
+  const addToCartButton = event.target.closest(`
+    #add-to-cart-button, 
+    [data-action="add-to-cart"], 
+    .add-to-cart-button, 
+    .a-button-input[value*="Add to Cart"],
+    .a-button-input[value*="add to cart"],
+    .a-button-input[value*="Add to Cart"],
+    .a-button[data-action="add-to-cart"],
+    .a-button[aria-label*="Add to Cart"],
+    .a-button[aria-label*="add to cart"],
+    .a-button-input[aria-label*="Add to Cart"],
+    .a-button-input[aria-label*="add to cart"],
+    .a-button[title*="Add to Cart"],
+    .a-button[title*="add to cart"],
+    .a-button-input[title*="Add to Cart"],
+    .a-button-input[title*="add to cart"],
+    .a-button[data-csa-c-type="button"][data-csa-c-slot-id*="add-to-cart"],
+    .a-button[data-csa-c-type="button"][data-csa-c-slot-id*="addToCart"],
+    .a-button-input[data-asin],
+    .a-button-input[aria-labelledby*="announce"],
+    input.a-button-input[type="submit"]
+  `);
+  
+  if (addToCartButton) {
+    console.log("Add to Cart button detected:", addToCartButton);
+    
+    if (isProceedingWithPurchase) {
+      console.log("Bypass flag is set, allowing purchase without intervention.");
+      isProceedingWithPurchase = false;
+      return;
+    }
+
+    // Prevent the default action immediately
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    
+    // Disable the button immediately
+    addToCartButton.disabled = true;
+    
+    // If it's a submit button, prevent form submission
+    if (addToCartButton.type === 'submit') {
+      const form = addToCartButton.closest('form');
+      if (form) {
+        form.onsubmit = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        };
+      }
+    }
+
+    // Store a reference to the clicked button
+    originalAddToCartButton = addToCartButton;
+
+    // Determine if we're on a product page or shopping page
+    const isProductPage = document.getElementById('productTitle') !== null;
+    console.log("Page type detected:", isProductPage ? "Product page" : "Shopping page");
+    
+    let productName = 'this item';
+    let productPrice = 'a high price';
+    let numericPrice = 0;
+
+    if (isProductPage) {
+      // Product page logic (existing code)
+      try {
+        const titleEl = document.getElementById('productTitle') || document.querySelector('h1#title');
+        if (titleEl && titleEl.innerText) {
+          productName = titleEl.innerText.trim();
+        }
+      } catch (e) {
+        console.error("Impulse Control: Error extracting product name.", e);
+      }
+      
+      try {
+        const priceElement = document.querySelector('.a-price, #priceblock_ourprice, .priceToPay, .a-price-whole');
+        if (priceElement) {
+          const priceWhole = priceElement.querySelector('.a-price-whole');
+          const priceFraction = priceElement.querySelector('.a-price-fraction');
+          if (priceWhole && priceFraction) {
+            productPrice = `${priceWhole.innerText.trim()}${priceFraction.innerText.trim()}`;
+            numericPrice = parseFloat(`${priceWhole.innerText.trim()}${priceFraction.innerText.trim().replace('.', '')}`);
+          } else {
+            const priceText = priceElement.innerText.trim().split(/\\n/).find(s => s.trim().startsWith('$') || s.trim().startsWith('CDN$'));
+            if (priceText) {
+              productPrice = priceText;
+              numericPrice = parseFloat(priceText.replace(/[^\\d.]/g, ''));
+            } else {
+              productPrice = priceElement.innerText.trim();
+              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\\d.]/g, ''));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Impulse Control: Error extracting product price.", e);
+      }
+    } else {
+      // Shopping page logic - find the product card containing the clicked button
+      try {
+        // Try multiple selectors for product cards
+        const productCard = addToCartButton.closest(`
+          [data-component-type="s-search-result"], 
+          .s-result-item, 
+          .sg-col-inner,
+          .s-card-container,
+          .s-card,
+          [data-cel-widget="search_result"],
+          .a-section.a-spacing-base,
+          .a-section.a-spacing-medium,
+          .a-section.a-spacing-small,
+          .a-section.a-spacing-none
+        `);
+        
+        console.log("Product card found:", productCard);
+        
+        if (productCard) {
+          // Try to find product name in the card - more specific selectors for Amazon product titles
+          const nameCandidates = productCard.querySelectorAll(`
+            h2 a[href*="/dp/"],
+            h2 a[href*="/gp/product/"],
+            .a-link-normal[href*="/dp/"],
+            .a-link-normal[href*="/gp/product/"],
+            .a-text-normal[href*="/dp/"],
+            .a-text-normal[href*="/gp/product/"],
+            [data-cy="title-recipe-link"],
+            .a-link-normal[data-cy="title-recipe-link"],
+            .a-size-base-plus[href*="/dp/"],
+            .a-size-medium[href*="/dp/"],
+            .a-size-large[href*="/dp/"],
+            .a-link-normal.s-underline-text[href*="/dp/"],
+            .a-link-normal.s-underline-text.s-underline-link-text[href*="/dp/"]
+          `);
+          
+          let foundName = false;
+          for (const el of nameCandidates) {
+            // Skip if it's a button or input
+            if (el.tagName.toLowerCase() === 'button' || el.tagName.toLowerCase() === 'input') continue;
+            // Skip if the text is 'Add to Cart' or similar button text
+            const text = el.innerText.trim();
+            if (text && 
+                text.length > 3 && 
+                !/^add to cart$/i.test(text) && 
+                !/^buy now$/i.test(text) &&
+                !/^add to list$/i.test(text) &&
+                !/^subscribe & save$/i.test(text) &&
+                !/^free delivery$/i.test(text) &&
+                !/^prime$/i.test(text) &&
+                !/^in stock$/i.test(text) &&
+                !/^out of stock$/i.test(text)) {
+              productName = text;
+              foundName = true;
+              console.log("Product name extracted:", productName);
+              break;
+            }
+          }
+          
+          if (!foundName) {
+            // Fallback: look for any link with product URL pattern that has meaningful text
+            const allLinks = productCard.querySelectorAll('a[href*="/dp/"], a[href*="/gp/product/"]');
+            for (const link of allLinks) {
+              const text = link.innerText?.trim();
+              if (text && 
+                  text.length > 5 && 
+                  !/^add to cart$/i.test(text) && 
+                  !/^buy now$/i.test(text) &&
+                  !/^add to list$/i.test(text) &&
+                  !/^subscribe & save$/i.test(text) &&
+                  !/^free delivery$/i.test(text) &&
+                  !/^prime$/i.test(text) &&
+                  !/^in stock$/i.test(text) &&
+                  !/^out of stock$/i.test(text) &&
+                  !/^\d+$/i.test(text)) { // Skip if it's just a number
+                productName = text;
+                console.log("Fallback product name extracted:", productName);
+                break;
+              }
+            }
+          }
+          
+          if (!foundName) {
+            console.log("Could not find product name, using default");
+          }
+          
+          // Try to find price in the card - expanded selectors
+          const priceElement = productCard.querySelector(`
+            .a-price, 
+            .a-price-whole, 
+            .a-offscreen,
+            .a-price-current,
+            .a-price-range,
+            .a-price .a-offscreen,
+            .a-price-current .a-offscreen,
+            .a-price-range .a-offscreen,
+            .a-price.a-text-price,
+            .a-price.a-text-price .a-offscreen
+          `);
+          
+          if (priceElement) {
+            const priceWhole = priceElement.querySelector('.a-price-whole');
+            const priceFraction = priceElement.querySelector('.a-price-fraction');
+            if (priceWhole && priceFraction) {
+              productPrice = `${priceWhole.innerText.trim()}${priceFraction.innerText.trim()}`;
+              numericPrice = parseFloat(`${priceWhole.innerText.trim()}${priceFraction.innerText.trim().replace('.', '')}`);
+            } else if (priceElement.innerText) {
+              productPrice = priceElement.innerText.trim();
+              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\\d.]/g, ''));
+            }
+            console.log("Product price extracted:", productPrice);
+          }
+        }
+      } catch (e) {
+        console.error("Impulse Control: Error extracting product info from shopping page.", e);
+      }
+    }
+
+    const product = {
+      name: productName,
+      price: productPrice,
+      numericPrice: numericPrice || 0
+    };
+
+    // Send product info to background script
+    console.log("Sending product info to background and awaiting decision:", product);
+    chrome.runtime.sendMessage({ type: "PRODUCT_ADDED", product: product });
+  }
+});
+
 function showAIPopup(product, initialArgument) {
   if (document.getElementById('impulse-control-popup')) return;
 
@@ -21,6 +253,10 @@ function showAIPopup(product, initialArgument) {
         <input type="text" id="impulse-control-chat-input" placeholder="Argue your case..." autocomplete="off">
         <button type="submit">Send</button>
       </form>
+      <div id="impulse-control-final-actions">
+        <button id="impulse-control-cancel-btn">Cancel Purchase</button>
+        <button id="impulse-control-proceed-btn" disabled>Proceed to Purchase</button>
+      </div>
     </div>
   `;
 
@@ -44,6 +280,13 @@ function showAIPopup(product, initialArgument) {
     #impulse-control-chat-form { display: flex; border-top: 1px solid #eee; padding: 10px; flex-shrink: 0; }
     #impulse-control-chat-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 8px 15px; font-size: 1rem; }
     #impulse-control-chat-form button { background-color: #007bff; color: white; border: none; border-radius: 20px; padding: 8px 15px; margin-left: 10px; cursor: pointer; }
+  
+    /* Final Action Buttons */
+    #impulse-control-final-actions { display: flex; justify-content: space-between; padding: 10px; border-top: 1px solid #eee; }
+    #impulse-control-final-actions button { padding: 10px 15px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; }
+    #impulse-control-cancel-btn { background-color: #dc3545; color: white; }
+    #impulse-control-proceed-btn { background-color: #28a745; color: white; }
+    #impulse-control-proceed-btn:disabled { background-color: #6c757d; cursor: not-allowed; }
   `;
 
   document.head.appendChild(style);
@@ -52,6 +295,8 @@ function showAIPopup(product, initialArgument) {
   const chatArea = document.getElementById('ai-chat-area');
   const chatForm = document.getElementById('impulse-control-chat-form');
   const chatInput = document.getElementById('impulse-control-chat-input');
+  const proceedBtn = document.getElementById('impulse-control-proceed-btn');
+  const cancelBtn = document.getElementById('impulse-control-cancel-btn');
 
   function appendMessage(text, sender) {
     const messageDiv = document.createElement('div');
@@ -61,6 +306,12 @@ function showAIPopup(product, initialArgument) {
     chatArea.scrollTop = chatArea.scrollHeight; // Auto-scroll to bottom
   }
   
+  function closePopup() {
+    popup.remove();
+    style.remove();
+    overlay.remove();
+  }
+
   // Display initial argument
   appendMessage(`Regarding ${product.name} for ${product.price}: ${initialArgument}`, 'ai');
 
@@ -85,61 +336,21 @@ function showAIPopup(product, initialArgument) {
     }
   });
 
-  document.getElementById('impulse-control-close-btn').addEventListener('click', function() {
-    popup.remove();
-    style.remove();
-    overlay.remove(); // Also remove the overlay
+  document.getElementById('impulse-control-close-btn').addEventListener('click', closePopup);
+  cancelBtn.addEventListener('click', closePopup);
+
+  proceedBtn.addEventListener('click', () => {
+    closePopup();
+    // Re-click the original "Add to Cart" button.
+    if (originalAddToCartButton) {
+      console.log("Purchase allowed! Clicking the original button.");
+      isProceedingWithPurchase = true;
+      originalAddToCartButton.click();
+    } else {
+      console.log("Could not find the original button. Please click it again.");
+    }
   });
 }
-
-document.addEventListener('click', function(event) {
-  const addToCartButton = event.target.closest('#add-to-cart-button');
-  if (addToCartButton) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    // 1. Super-Robust Product Information Extraction
-    let productName = 'this item';
-    try {
-        const titleEl = document.getElementById('productTitle') || document.querySelector('h1#title');
-        if (titleEl && titleEl.innerText) {
-            productName = titleEl.innerText.trim();
-        }
-    } catch (e) {
-        console.error("Impulse Control: Error extracting product name.", e);
-    }
-    
-    let productPrice = 'a high price';
-    try {
-      // Find a price element using multiple common selectors for Amazon
-      const priceElement = document.querySelector('.a-price, #priceblock_ourprice, .priceToPay, .a-price-whole');
-      if (priceElement) {
-        // Prefer the '.a-offscreen' price, as it's often the raw, clean price
-        const offscreenPrice = priceElement.querySelector('.a-offscreen');
-        if (offscreenPrice && offscreenPrice.innerText) {
-            productPrice = offscreenPrice.innerText.trim();
-        } else if (priceElement.innerText) {
-            // As a fallback, take the first non-empty line of text from the element
-            const priceText = priceElement.innerText.trim().split(/\\n/).find(s => s.trim() !== '');
-            if (priceText) {
-                productPrice = priceText;
-            }
-        }
-      }
-    } catch (e) {
-        console.error("Impulse Control: Error extracting product price.", e);
-    }
-
-    const product = {
-      name: productName,
-      price: productPrice
-    };
-
-    // 2. Send product info to background script
-    console.log("Sending product info to background and awaiting decision:", product);
-    chrome.runtime.sendMessage({ type: "PRODUCT_ADDED", product: product });
-  }
-});
 
 // Add a listener for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -157,6 +368,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       messageDiv.innerText = request.message;
       chatArea.appendChild(messageDiv);
       chatArea.scrollTop = chatArea.scrollHeight;
+    }
+  } else if (request.type === "UNLOCK_PROCEED") {
+    console.log("Content: Received instruction to unlock proceed button.");
+    const proceedBtn = document.getElementById('impulse-control-proceed-btn');
+    if (proceedBtn) {
+      proceedBtn.disabled = false;
     }
   }
 }); 
