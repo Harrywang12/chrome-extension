@@ -5,6 +5,45 @@ let isProceedingWithPurchase = false;
 
 // Add mousedown listener to catch events even earlier
 document.addEventListener('mousedown', async function(event) {
+  // Check if we're on an actual Amazon shopping/product page
+  const isAmazonShoppingPage = (
+    window.location.hostname.includes('amazon.com') || 
+    window.location.hostname.includes('amazon.ca') ||
+    window.location.hostname.includes('amazon.co.uk') ||
+    window.location.hostname.includes('amazon.de') ||
+    window.location.hostname.includes('amazon.fr') ||
+    window.location.hostname.includes('amazon.it') ||
+    window.location.hostname.includes('amazon.es') ||
+    window.location.hostname.includes('amazon.co.jp') ||
+    window.location.hostname.includes('amazon.in') ||
+    window.location.hostname.includes('amazon.com.au')
+  ) && !(
+    window.location.pathname.includes('/signin') ||
+    window.location.pathname.includes('/login') ||
+    window.location.pathname.includes('/register') ||
+    window.location.pathname.includes('/account') ||
+    window.location.pathname.includes('/help') ||
+    window.location.pathname.includes('/customer-service') ||
+    window.location.pathname.includes('/contact') ||
+    window.location.pathname.includes('/about') ||
+    window.location.pathname.includes('/careers') ||
+    window.location.pathname.includes('/press') ||
+    window.location.pathname.includes('/legal') ||
+    window.location.pathname.includes('/privacy') ||
+    window.location.pathname.includes('/terms')
+  );
+
+  console.log("Page detection:", {
+    hostname: window.location.hostname,
+    pathname: window.location.pathname,
+    isAmazonShoppingPage: isAmazonShoppingPage
+  });
+
+  if (!isAmazonShoppingPage) {
+    console.log("Not on Amazon shopping page, skipping...");
+    return; // Don't trigger on non-shopping pages
+  }
+
   const addToCartButton = event.target.closest(`
     #add-to-cart-button, 
     [data-action="add-to-cart"], 
@@ -25,7 +64,22 @@ document.addEventListener('mousedown', async function(event) {
     .a-button[data-csa-c-type="button"][data-csa-c-slot-id*="addToCart"],
     .a-button-input[data-asin],
     .a-button-input[aria-labelledby*="announce"],
-    input.a-button-input[type="submit"]
+    input.a-button-input[type="submit"],
+    #buy-now-button,
+    [data-action="buy-now"],
+    .buy-now-button,
+    .a-button-input[value*="Buy Now"],
+    .a-button-input[value*="buy now"],
+    .a-button[aria-label*="Buy Now"],
+    .a-button[aria-label*="buy now"],
+    .a-button-input[aria-label*="Buy Now"],
+    .a-button-input[aria-label*="buy now"],
+    .a-button[title*="Buy Now"],
+    .a-button[title*="buy now"],
+    .a-button-input[title*="Buy Now"],
+    .a-button-input[title*="buy now"],
+    .a-button[data-csa-c-type="button"][data-csa-c-slot-id*="buy-now"],
+    .a-button[data-csa-c-type="button"][data-csa-c-slot-id*="buyNow"]
   `);
   
   if (addToCartButton) {
@@ -85,17 +139,11 @@ document.addEventListener('mousedown', async function(event) {
           const priceWhole = priceElement.querySelector('.a-price-whole');
           const priceFraction = priceElement.querySelector('.a-price-fraction');
           if (priceWhole && priceFraction) {
-            productPrice = `${priceWhole.innerText.trim()}${priceFraction.innerText.trim()}`;
-            numericPrice = parseFloat(`${priceWhole.innerText.trim()}${priceFraction.innerText.trim().replace('.', '')}`);
-          } else {
-            const priceText = priceElement.innerText.trim().split(/\\n/).find(s => s.trim().startsWith('$') || s.trim().startsWith('CDN$'));
-            if (priceText) {
-              productPrice = priceText;
-              numericPrice = parseFloat(priceText.replace(/[^\\d.]/g, ''));
-            } else {
-              productPrice = priceElement.innerText.trim();
-              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\\d.]/g, ''));
-            }
+            productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
+            numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
+          } else if (priceElement.innerText) {
+            productPrice = priceElement.innerText.trim().replace(/\s+/g, '');
+            numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\d.]/g, ''));
           }
         }
       } catch (e) {
@@ -306,7 +354,6 @@ document.addEventListener('mousedown', async function(event) {
                   !/^free delivery$/i.test(text) &&
                   !/^prime$/i.test(text) &&
                   !/^in stock$/i.test(text) &&
-                  !/^out of stock$/i.test(text) &&
                   !/^\d+$/i.test(text)) { // Skip if it's just a number
                 productName = text;
                 console.log("Fallback product name extracted:", productName);
@@ -412,11 +459,11 @@ document.addEventListener('mousedown', async function(event) {
             const priceWhole = priceElement.querySelector('.a-price-whole');
             const priceFraction = priceElement.querySelector('.a-price-fraction');
             if (priceWhole && priceFraction) {
-              productPrice = `${priceWhole.innerText.trim()}${priceFraction.innerText.trim()}`;
-              numericPrice = parseFloat(`${priceWhole.innerText.trim()}${priceFraction.innerText.trim().replace('.', '')}`);
+              productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
+              numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
             } else if (priceElement.innerText) {
-              productPrice = priceElement.innerText.trim();
-              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\\d.]/g, ''));
+              productPrice = priceElement.innerText.trim().replace(/\s+/g, '');
+              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\d.]/g, ''));
             }
             console.log("Product price extracted:", productPrice);
           }
@@ -521,11 +568,11 @@ document.addEventListener('mousedown', async function(event) {
             const priceWhole = pagePriceElement.querySelector('.a-price-whole');
             const priceFraction = pagePriceElement.querySelector('.a-price-fraction');
             if (priceWhole && priceFraction) {
-              productPrice = `${priceWhole.innerText.trim()}${priceFraction.innerText.trim()}`;
-              numericPrice = parseFloat(`${priceWhole.innerText.trim()}${priceFraction.innerText.trim().replace('.', '')}`);
+              productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
+              numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
             } else if (pagePriceElement.innerText) {
-              productPrice = pagePriceElement.innerText.trim();
-              numericPrice = parseFloat(pagePriceElement.innerText.trim().replace(/[^\\d.]/g, ''));
+              productPrice = pagePriceElement.innerText.trim().replace(/\s+/g, '');
+              numericPrice = parseFloat(pagePriceElement.innerText.trim().replace(/[^\d.]/g, ''));
             }
             console.log("Product price from page-wide search:", productPrice);
           }
@@ -608,6 +655,9 @@ function showAIPopup(product, initialArgument) {
     .chat-message { margin-bottom: 15px; padding: 8px 12px; border-radius: 18px; max-width: 80%; line-height: 1.4; }
     .ai-message { background-color: #f1f0f0; align-self: flex-start; }
     .user-message { background-color: #007bff; color: white; align-self: flex-end; }
+    
+    /* Prevent line breaks in prices */
+    .chat-message .price { white-space: nowrap; display: inline; color: inherit; }
     
     #impulse-control-chat-form { display: flex; border-top: 1px solid #eee; padding: 10px; flex-shrink: 0; }
     #impulse-control-chat-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 8px 15px; font-size: 1rem; }
@@ -766,7 +816,12 @@ function showAIPopup(product, initialArgument) {
   function appendMessage(text, sender) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('chat-message', `${sender}-message`);
-    messageDiv.innerText = text;
+    
+    // Wrap prices in spans to prevent line breaks - handle various price formats
+    // This pattern handles both $ prices and plain numbers with decimals
+    const formattedText = text.replace(/(\$\d+(?:,\d{3})*(?:\.\d{2})?|\d+(?:,\d{3})*(?:\.\d{2})?)/g, '<span class="price">$1</span>');
+    messageDiv.innerHTML = formattedText;
+    
     chatArea.appendChild(messageDiv);
     chatArea.scrollTop = chatArea.scrollHeight; // Auto-scroll to bottom
   }
@@ -819,6 +874,16 @@ function showAIPopup(product, initialArgument) {
     
     // Determine if we're on a shopping page
     const isShoppingPage = !document.getElementById('productTitle');
+    
+    // Check if the original button was a "Buy Now" button
+    const isBuyNowButton = originalAddToCartButton && (
+      originalAddToCartButton.id === 'buy-now-button' ||
+      originalAddToCartButton.getAttribute('data-action') === 'buy-now' ||
+      originalAddToCartButton.classList.contains('buy-now-button') ||
+      (originalAddToCartButton.value && originalAddToCartButton.value.toLowerCase().includes('buy now')) ||
+      (originalAddToCartButton.getAttribute('aria-label') && originalAddToCartButton.getAttribute('aria-label').toLowerCase().includes('buy now')) ||
+      (originalAddToCartButton.getAttribute('title') && originalAddToCartButton.getAttribute('title').toLowerCase().includes('buy now'))
+    );
     
     if (isShoppingPage && originalAddToCartButton) {
       console.log("Shopping page detected - automatically adding to cart...");
@@ -892,7 +957,7 @@ function showAIPopup(product, initialArgument) {
       // Product page - use original method
       console.log("Product page detected - using original method");
       if (originalAddToCartButton) {
-        console.log("Purchase allowed! Clicking the original button.");
+        console.log(`Purchase allowed! Clicking the original ${isBuyNowButton ? 'Buy Now' : 'Add to Cart'} button.`);
         isProceedingWithPurchase = true;
         originalAddToCartButton.disabled = false;
         originalAddToCartButton.click();
