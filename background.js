@@ -58,7 +58,14 @@ async function shortenProductName(fullName) {
     return fullName; // Fallback to original name
   }
   
-  const prompt = `Shorten this Amazon product name to something more conversational and concise (max 5-6 words): "${fullName}". Return only the shortened name, nothing else.`;
+  const prompt = `Shorten this Amazon product name to something ordinary and conversational that everyone would naturally call it. Include the brand name if it adds clarity, but make it sound like how you'd refer to it in everyday conversation. For example:
+- "Wilson Federer Pro Tennis Racket" → "tennis racket" or "Wilson tennis racket"
+- "Samsung 65-inch Class QLED 4K UHD Smart TV" → "Samsung TV" or "TV"
+- "Apple iPhone 15 Pro Max 256GB" → "iPhone" or "iPhone 15"
+- "Nike Air Jordan 1 Retro High OG" → "Nike sneakers" or "Jordan sneakers"
+
+Product: "${fullName}"
+Return only the shortened, ordinary name, nothing else.`;
 
   try {
     const response = await fetch(GROQ_API_URL, {
@@ -132,9 +139,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "PRODUCT_ADDED") {
     (async () => {
+      console.log("Background: Received product:", request.product.name);
+      
       if (!(await isEssential(request.product.name))) {
         // Shorten the product name first
+        console.log("Background: Shortening product name...");
         const shortenedName = await shortenProductName(request.product.name);
+        console.log("Background: Shortened name result:", shortenedName);
         
         // Define the AI's persona and initial prompt using the shortened name
         const systemPrompt = `You are an AI assistant designed to curb impulse buying. Your goal is to be a friendly, slightly snarky "de-influencer". A user wants to buy "${shortenedName}" for "${request.product.price}". Engage in a conversation to make them reconsider. Be persuasive, a bit funny, and focus on saving money, questioning needs vs. wants, and delayed gratification. Keep your responses concise but complete - finish your thoughts. Do not ask questions in your first message.`;
