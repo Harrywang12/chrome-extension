@@ -258,6 +258,11 @@ function safeSendMessage(message) {
 // --- MESSAGE HANDLING ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // If the runtime ID is gone, the context is invalidated. Do nothing.
+    if (!chrome.runtime?.id) {
+        return;
+    }
+
     const shadow = document.getElementById('cartwatch-modal-container')?.shadowRoot;
     switch (message.type) {
         case 'AI_RESPONSE':

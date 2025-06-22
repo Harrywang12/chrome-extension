@@ -38,8 +38,9 @@ export async function isPurchaseApproved(purchaseKey) {
  * @param {object} product - The product/purchase that was debated.
  * @param {string} hostname - The hostname of the site.
  * @param {'won' | 'lost'} outcome - The result of the debate.
+ * @param {string} identifier - The unique identifier for the product page (e.g., ASIN).
  */
-export async function recordDebateResult(product, hostname, outcome) {
+export async function recordDebateResult(product, hostname, outcome, identifier) {
     const { stats, history, blockedSites, approvedPurchases } = await getStorage();
 
     // --- Update Stats ---
@@ -48,14 +49,17 @@ export async function recordDebateResult(product, hostname, outcome) {
 
     if (outcome === 'won') {
         newStats.debatesWon += 1;
-        // Approve this purchase for the next 5 minutes
-        const purchaseKey = hostname + product.price;
+        // Approve this purchase for the next 5 minutes using its unique identifier
+        const purchaseKey = `${hostname}::${identifier}`;
         approvedPurchases[purchaseKey] = new Date().getTime();
     } else { // 'lost'
         newStats.moneySaved += product.price;
-        // Block this site for 60 minutes
-        const blockUntil = new Date().getTime() + 60 * 60 * 1000;
-        blockedSites[hostname] = blockUntil;
+        // We are removing the site-blocking functionality as per the user's request.
+        // The user should be able to refresh and try again immediately.
+        //
+        // Original blocking logic for reference:
+        // const blockUntil = new Date().getTime() + 60 * 60 * 1000;
+        // blockedSites[hostname] = blockUntil;
     }
 
     // --- Update History ---

@@ -4,6 +4,23 @@ import { getCheaperAlternatives } from './serper.js';
 
 console.log("CartWatch background service worker started.");
 
+/**
+ * Extracts a unique product identifier from a URL.
+ * For Amazon, it's the ASIN. For others, it's the pathname.
+ * @param {URL} url - The URL object of the product page.
+ * @returns {string} A unique identifier for the product.
+ */
+function getIdentifierFromUrl(url) {
+    if (url.hostname.includes('amazon')) {
+        const asinRegex = /\/(dp|gp\/product)\/([A-Z0-9]{10})/;
+        const match = url.pathname.match(asinRegex);
+        if (match && match[2]) {
+            return match[2]; // Return the ASIN
+        }
+    }
+    return url.pathname; // Fallback to the full pathname for other sites
+}
+
 // --- Message Listener ---
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
@@ -25,8 +42,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handlePurchaseAttempt(message, sender, sendResponse) {
     const { product } = message;
     const { tab } = sender;
-    const hostname = new URL(tab.url).hostname;
-    const purchaseKey = hostname + product.price;
+    const url = new URL(tab.url);
+    const hostname = url.hostname;
+    const identifier = getIdentifierFromUrl(url);
+
+    // Make the purchase key specific to the unique product identifier (e.g., ASIN).
+    const purchaseKey = `${hostname}::${identifier}`;
 
     if (await isSiteBlocked(hostname)) {
         console.log(`Site ${hostname} is blocked. Responding with 'block'.`);
@@ -57,6 +78,7 @@ async function handlePurchaseAttempt(message, sender, sendResponse) {
             product,
             tabId: tab.id,
             hostname,
+            identifier, // Store the identifier for later
             conversation: conversationForSession,
         }
     });
@@ -96,7 +118,7 @@ async function handleUserMessage(message, sender, sendResponse) {
 async function handleEndDebate(message, sender, sendResponse) {
     const { currentDebate } = await chrome.storage.session.get('currentDebate');
     if (currentDebate) {
-        await recordDebateResult(currentDebate.product, currentDebate.hostname, message.outcome);
+        await recordDebateResult(currentDebate.product, currentDebate.hostname, message.outcome, currentDebate.identifier);
         chrome.storage.session.remove('currentDebate');
         chrome.tabs.sendMessage(sender.tab.id, { type: 'CLOSE_DEBATE_MODAL', outcome: message.outcome });
     }
