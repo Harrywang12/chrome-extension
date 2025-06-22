@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CartWatch Dashboard</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <div class="logo-title">
+                <img src="../../assets/icons/icon48.png" alt="CartWatch Logo" class="logo">
+                <h1>CartWatch</h1>
+            </div>
+            <div class="status-indicator">
+                <span>Active</span>
+            </div>
+        </header>
+
+        <section class="main-stat">
+            <h2>Total Saved</h2>
+            <p>$<span id="money-saved">0.00</span></p>
+        </section>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <h3>Debates Won</h3>
+                <p><span id="debates-won">0</span></p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Debates</h3>
+                <p><span id="total-debates">0</span></p>
+            </div>
+            <div class="stat-card">
+                <h3>Win Rate</h3>
+                <p><span id="win-rate">N/A</span></p>
+            </div>
+        </section>
+
+        <section class="history-section">
+            <h2>Recent Activity</h2>
+            <div id="history-list" class="history-list">
+                <div class="history-item-placeholder">
+                    <p>No recent purchase debates.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="dashboard-footer">
+            <p>Thoughtful spending, one debate at a time.</p>
+        </footer>
+    </div>
+    <script src="index.js"></script>
+</body>
+</html>
