@@ -19,12 +19,18 @@ function createModal(product, firstMessage, alternatives) {
     const shadow = modalWrapper.attachShadow({ mode: 'open' });
 
     let alternativesHTML = '';
-    if (alternatives && alternatives.length > 0) {
+    const hasAlternatives = alternatives && alternatives.length > 0;
+    
+    if (hasAlternatives) {
+        const alternativeType = alternatives[0].type;
+        const panelTitle = alternativeType === 'product' ? "Cheaper Alternatives" : "Coupons & Deals";
+        const panelSubtitle = alternativeType === 'product' ? "Similar Products on Amazon" : "Found via Web Search";
+
         alternativesHTML = `
             <div class="alternatives-panel">
                 <header>
-                    <h3>Cheaper Alternatives</h3>
-                    <p>Found via Serper API</p>
+                    <h3>${panelTitle}</h3>
+                    <p>${panelSubtitle}</p>
                 </header>
                 <ul>
                     ${alternatives.map(alt => `
@@ -41,16 +47,46 @@ function createModal(product, firstMessage, alternatives) {
     }
 
     shadow.innerHTML = `
-        <style>/* Polished, light-themed CSS */
+        <style>/* --- Modern & Premium UI Overhaul --- */
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-            :host {
-                --surface-color: #fff; --primary-text: #212529; --secondary-text: #6c757d;
-                --accent-primary: #007bff; --accent-secondary: #6f42c1; --border-color: #dee2e6;
-                --shadow-color: rgba(0, 0, 0, 0.1); --font-primary: 'Inter', sans-serif;
-                --success-color: #28a745; --danger-color: #dc3545;
-            }
-            .backdrop { z-index:2147483647; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; }
             
+            :host {
+                /* Color Palette */
+                --surface-color: #ffffff;
+                --primary-background: #f7f8fc;
+                --primary-text: #1a1a1a;
+                --secondary-text: #5c5f6e;
+                --accent-primary: #4f46e5;
+                --accent-primary-hover: #4338ca;
+                --border-color: #e5e7eb;
+                --shadow-color: rgba(79, 70, 229, 0.1);
+                --success-color: #16a34a;
+                --danger-color: #dc2626;
+                --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            }
+
+            /* Main Backdrop & Animation */
+            .backdrop {
+                z-index: 2147483647;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(26, 26, 26, 0.5);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            @keyframes fade-in-up {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Main Layout */
             .main-container {
                 display: flex;
                 flex-direction: row;
@@ -58,47 +94,172 @@ function createModal(product, firstMessage, alternatives) {
                 gap: 24px;
             }
 
-            .container { font-family:var(--font-primary); width:520px; max-width:90vw; height:620px; max-height:85vh; background:var(--surface-color); border-radius:16px; box-shadow:0 8px 32px var(--shadow-color); display:flex; flex-direction:column; overflow:hidden; }
-            .header { padding:24px; border-bottom:1px solid var(--border-color); text-align:center; }
-            .header h2 { font-size:24px; font-weight:700; margin:0 0 8px; background:linear-gradient(45deg, var(--accent-primary), var(--accent-secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-            .header p { margin:0; color:var(--secondary-text); }
-            .header p span { color:var(--primary-text); font-weight:600; }
-            .chat-window { flex-grow:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
-            .message { max-width:85%; padding:12px 18px; border-radius:20px; line-height:1.6; }
-            .message p { margin:0; }
-            .ai { background:#f1f3f5; align-self:flex-start; border-bottom-left-radius:4px; }
-            .user { background:var(--accent-primary); color:white; align-self:flex-end; border-bottom-right-radius:4px; }
-            .footer { padding:24px; border-top:1px solid var(--border-color); }
-            .input-area { display:flex; gap:12px; margin-bottom:16px; }
-            #user-input { flex-grow:1; background:#f1f3f5; border:1px solid var(--border-color); border-radius:25px; padding:12px 18px; color:var(--primary-text); font-size:16px; }
-            #user-input:focus { outline:none; border-color:var(--accent-primary); }
-            #send-btn { background:var(--accent-primary); color:white; border:none; border-radius:25px; padding:0 24px; font-size:16px; font-weight:600; cursor:pointer; }
-            .button-area { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-            .action-btn { border:none; border-radius:8px; padding:14px; font-size:16px; font-weight:600; cursor:pointer; transition:opacity 0.2s ease; }
-            .action-btn.give-up { background:var(--danger-color); color:white; }
-            .action-btn.proceed { background:var(--success-color); color:white; }
-            .action-btn:disabled { opacity:0.5; cursor:not-allowed; }
+            /* --- Chat Modal --- */
+            .container {
+                font-family: var(--font-primary);
+                width: 520px;
+                max-width: 90vw;
+                height: 620px;
+                max-height: 85vh;
+                background: var(--surface-color);
+                border-radius: 20px;
+                box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+                animation: fade-in-up 0.4s ease-out forwards;
+            }
+
+            /* Header */
+            .header {
+                padding: 24px;
+                border-bottom: 1px solid var(--border-color);
+                text-align: center;
+            }
+            .header h2 {
+                font-size: 24px;
+                font-weight: 700;
+                margin: 0 0 8px;
+                color: var(--primary-text);
+            }
+            .header p {
+                margin: 0;
+                color: var(--secondary-text);
+                font-size: 16px;
+            }
+            .header p span {
+                color: var(--accent-primary);
+                font-weight: 600;
+            }
+
+            /* Chat Window */
+            .chat-window {
+                flex-grow: 1;
+                padding: 16px 24px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                background-color: var(--primary-background);
+            }
+            .message {
+                max-width: 85%;
+                padding: 12px 18px;
+                border-radius: 18px;
+                line-height: 1.6;
+                word-wrap: break-word;
+            }
+            .message p { margin: 0; }
+            .ai {
+                background: #e5e7eb;
+                color: var(--primary-text);
+                align-self: flex-start;
+                border-bottom-left-radius: 4px;
+            }
+            .user {
+                background: var(--accent-primary);
+                color: white;
+                align-self: flex-end;
+                border-bottom-right-radius: 4px;
+            }
+
+            /* Footer & Inputs */
+            .footer {
+                padding: 16px 24px;
+                border-top: 1px solid var(--border-color);
+                background: var(--surface-color);
+            }
+            .input-area {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            #user-input {
+                flex-grow: 1;
+                background: var(--primary-background);
+                border: 1px solid var(--border-color);
+                border-radius: 25px;
+                padding: 12px 18px;
+                color: var(--primary-text);
+                font-size: 16px;
+                transition: border-color 0.2s, box-shadow 0.2s;
+            }
+            #user-input:focus {
+                outline: none;
+                border-color: var(--accent-primary);
+                box-shadow: 0 0 0 3px var(--shadow-color);
+            }
+            #send-btn {
+                background: var(--accent-primary);
+                color: white;
+                border: none;
+                border-radius: 25px;
+                padding: 0 24px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            #send-btn:hover {
+                background-color: var(--accent-primary-hover);
+            }
+            .button-area {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .action-btn {
+                border: none;
+                border-radius: 12px;
+                padding: 14px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: opacity 0.2s, transform 0.2s;
+            }
+            .action-btn:hover {
+                transform: translateY(-2px);
+            }
+            .action-btn.give-up {
+                background: var(--danger-color);
+                color: white;
+            }
+            .action-btn.proceed {
+                background: var(--success-color);
+                color: white;
+            }
+            .action-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none;
+            }
             .typing-indicator p span { display:inline-block; animation:bounce 0.6s infinite; }
             .typing-indicator p span:nth-child(2) { animation-delay:0.1s; }
             .typing-indicator p span:nth-child(3) { animation-delay:0.2s; }
             @keyframes bounce { 0%,100% {transform:translateY(0);} 50% {transform:translateY(-5px);} }
 
+            /* --- Alternatives Panel --- */
             .alternatives-panel {
-                width: 320px;
-                height: 620px; /* Match chat modal height */
+                width: 340px;
+                height: 620px;
                 max-height: 85vh;
-                background: #f8f9fa;
-                border-radius: 16px;
-                box-shadow: 0 8px 32px var(--shadow-color);
+                background: var(--primary-background);
+                border-radius: 20px;
+                box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
                 color: var(--primary-text);
                 font-family: var(--font-primary);
+                border: 1px solid var(--border-color);
+                animation: fade-in-up 0.4s ease-out 0.1s forwards;
+                opacity: 0; /* Start hidden for staggered animation */
             }
             .alternatives-panel header {
                 padding: 24px;
                 border-bottom: 1px solid var(--border-color);
+                background-color: var(--surface-color);
             }
             .alternatives-panel h3 {
                 margin: 0 0 4px;
@@ -119,7 +280,7 @@ function createModal(product, firstMessage, alternatives) {
                 flex-grow: 1;
             }
             .alternatives-panel li {
-                margin-bottom: 16px;
+                margin-bottom: 12px;
             }
             .alternatives-panel li a {
                 display: block;
@@ -129,11 +290,12 @@ function createModal(product, firstMessage, alternatives) {
                 text-decoration: none;
                 color: var(--primary-text);
                 background: var(--surface-color);
-                transition: box-shadow 0.2s ease, transform 0.2s ease;
+                transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
             }
             .alternatives-panel li a:hover {
                 box-shadow: 0 4px 12px rgba(0,0,0,0.08);
                 transform: translateY(-2px);
+                border-color: var(--accent-primary);
             }
             .alt-title {
                 font-size: 16px;
@@ -147,6 +309,23 @@ function createModal(product, firstMessage, alternatives) {
                 line-height: 1.5;
                 color: var(--secondary-text);
                 margin: 0;
+            }
+            .deal-info {
+                display: none; /* No longer used, but kept for future reference */
+            }
+            .alt-price {
+                font-size: 18px;
+                font-weight: 700;
+                color: var(--success-color);
+            }
+            .alt-source {
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--secondary-text);
+                background: var(--primary-background);
+                padding: 4px 8px;
+                border-radius: 6px;
+                border: 1px solid var(--border-color);
             }
         </style>
         <div class="backdrop">
@@ -354,9 +533,11 @@ function handlePurchaseClick(event) {
     if (isCheckoutFlow) {
         console.log("CartWatch: Checkout button intercepted.");
         priceInfo = extractTotalPrice();
+        priceInfo.isCart = true; // Add a flag to indicate this is a cart/checkout flow
     } else {
         console.log("CartWatch: 'Buy Now' / 'Add to Cart' button intercepted.");
         priceInfo = extractItemPrice(event.target);
+        priceInfo.isCart = false;
     }
 
     // Only activate the debate for items/carts that cost more than $50.

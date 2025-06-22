@@ -1,6 +1,6 @@
 import { getGeminiResponse } from './gemini.js';
 import { recordDebateResult, isSiteBlocked, isPurchaseApproved } from './storage.js';
-import { getCheaperAlternatives } from './serper.js';
+import { getCheaperProductAlternatives, getCartDeals } from './serper.js';
 
 console.log("CartWatch background service worker started.");
 
@@ -64,8 +64,15 @@ async function handlePurchaseAttempt(message, sender, sendResponse) {
     // This is a new debate.
     console.log("New debate initiated. Getting first AI message.");
 
-    // First, find cheaper alternatives using Serper API
-    const alternatives = await getCheaperAlternatives(product.name);
+    // Find cheaper alternatives or deals based on the context.
+    let alternatives = null;
+    if (product.isCart) {
+        console.log("Searching for sitewide deals...");
+        alternatives = await getCartDeals(hostname);
+    } else {
+        console.log(`Searching for cheaper product alternatives on ${hostname} for item priced at $${product.price}`);
+        alternatives = await getCheaperProductAlternatives(product.name, product.price, hostname);
+    }
 
     const aiResponse = await getGeminiResponse(product, [], alternatives);
     const conversationForSession = [

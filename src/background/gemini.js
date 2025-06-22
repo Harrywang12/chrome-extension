@@ -15,7 +15,7 @@ Your rules:
 1.  **Initiate the Conversation:** Start with a clever, context-aware opening based on the item's name and price that immediately establishes your skeptical stance.
 2.  **Analyze User Responses:** Evaluate the user's reasoning. Are they being thoughtful or just making excuses? Push back against weak arguments.
 3.  **Be Tougher:** Do not be easily swayed. Challenge flimsy justifications like "I deserve it" or "it's an investment" by asking for specific, concrete reasons. Make the user prove the purchase is truly wise.
-4.  **Use Alternatives:** If you are provided with a list of cheaper alternatives, use them in your arguments. Weave them into the conversation to challenge the user on whether the more expensive item is truly worth it.
+4.  **Use Alternatives & Deals:** You may be provided with a list of cheaper product alternatives OR a list of sitewide deals/coupons. Use this information intelligently in your arguments. For products, challenge the user on why the more expensive option is necessary. For deals, suggest that maybe they can save money on their whole cart.
 5.  **Manage Conversation Flow:** You will receive the entire conversation history. Your goal is to continue the debate, increasing the difficulty based on the price.
 6.  **Make a Decision:** You will be told when it is the user's final message. Only then should you decide to "unlock" the purchase.
 7.  **Decision - "unlock":** Only unlock the purchase if the user provides a genuinely thoughtful and convincing justification for the price. For expensive items, they must overcome your skepticism.
@@ -61,10 +61,16 @@ export async function getGeminiResponse(product, messages, alternatives) {
 
     const isFinalMessage = userMessagesCount >= requiredMessages;
 
-    let context_prompt = `Here is the item: Name: ${product.name}, Price: $${product.price.toFixed(2)}.`;
+    let context_prompt = `Here is the item context: Name: ${product.name}, Price: $${product.price.toFixed(2)}.`;
     if(alternatives && alternatives.length > 0) {
-        const alt_text = alternatives.map(alt => `- ${alt.title}: ${alt.snippet}`).join('\n');
-        context_prompt += `\n\nHere are some cheaper alternatives I found. Use them to challenge the user:\n${alt_text}`;
+        const isDeal = alternatives[0].isDeal;
+        if (isDeal) {
+            const alt_text = alternatives.map(alt => `- ${alt.title} from ${alt.source} for ${alt.price}`).join('\n');
+            context_prompt += `\n\nHere are some cheaper alternatives I found. Use them to challenge the user:\n${alt_text}`;
+        } else {
+            const alt_text = alternatives.map(alt => `- "${alt.title}" - ${alt.snippet}`).join('\n');
+            context_prompt += `\n\nHere are some potential sitewide deals or coupons I found. Mention these to the user:\n${alt_text}`;
+        }
     }
 
     const finalInstruction = isFinalMessage
