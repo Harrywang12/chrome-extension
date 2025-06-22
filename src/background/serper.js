@@ -10,6 +10,7 @@ const SERPER_API_KEY = "3354b828e805fa5fc2f38b2a6cea063610a370da"; // IMPORTANT:
 export async function getCheaperProductAlternatives(productName, productPrice, hostname) {
     if (!SERPER_API_KEY) return null;
     
+    // Perform a broad shopping search to get many results with price data.
     const query = `cheaper alternative to "${productName}"`;
 
     try {
@@ -27,28 +28,57 @@ export async function getCheaperProductAlternatives(productName, productPrice, h
         const data = await response.json();
 
         if (data.shopping && data.shopping.length > 0) {
-            const cheaperAlternatives = data.shopping
-                .map(item => {
-                    // Parse the price string (e.g., "$19.99") into a float.
-                    const itemPrice = parseFloat(String(item.price).replace(/[$,]/g, ''));
-                    return { ...item, priceFloat: itemPrice };
-                })
-                .filter(item => {
-                    // Ensure the item is on the same site, has a valid price, and is actually cheaper.
-                    const isOnSameSite = item.link && item.link.includes(hostname);
-                    const hasValidPrice = !isNaN(item.priceFloat);
-                    const isCheaper = hasValidPrice && item.priceFloat < productPrice && item.priceFloat > 0;
-                    
-                    return isOnSameSite && isCheaper;
-                });
+            console.log("Original Serper shopping results:", JSON.stringify(data.shopping, null, 2));
 
-            // Return up to 5 filtered results, formatting them for the UI.
-            return cheaperAlternatives.slice(0, 5).map(item => ({
-                type: 'product',
-                title: item.title,
-                link: item.link,
-                snippet: `Price: ${item.price} on ${item.source}`, // Create a clear snippet with price info
-            }));
+            const potentialAlternatives = data.shopping.map(item => {
+                const itemPrice = parseFloat(String(item.price).replace(/[$,]/g, ''));
+                return { ...item, priceFloat: itemPrice };
+            });
+
+            const cheaperAlternatives = potentialAlternatives.filter(item => {
+                const normalizedHostname = hostname.replace(/^www\./, '');
+                let itemHostname = null;
+                try {
+                    if (item.link) {
+                        itemHostname = new URL(item.link).hostname.replace(/^www\./, '');
+                    }
+                } catch (e) { return false; }
+
+                const isOnSameSite = itemHostname === normalizedHostname;
+                const hasValidPrice = !isNaN(item.priceFloat);
+                const isCheaper = hasValidPrice && item.priceFloat < productPrice && item.priceFloat > 0;
+                
+                return isOnSameSite && isCheaper;
+            });
+            
+            console.log("Filtered cheaper alternatives:", JSON.stringify(cheaperAlternatives, null, 2));
+
+            if (cheaperAlternatives.length > 0) {
+                // If we found truly cheaper items, return them.
+                return cheaperAlternatives.slice(0, 5).map(item => ({
+                    type: 'product_cheaper',
+                    title: item.title,
+                    link: item.link,
+                    snippet: `Price: ${item.price} on ${item.source}`,
+                }));
+            } else {
+                // Fallback: If no cheaper items were found, return the top 5 unfiltered results from the same site.
+                console.log("No cheaper items found, falling back to general alternatives.");
+                const generalAlternatives = potentialAlternatives
+                    .filter(item => {
+                         try {
+                            return item.link && new URL(item.link).hostname.replace(/^www\./, '') === hostname.replace(/^www\./, '');
+                        } catch(e) { return false; }
+                    })
+                    .slice(0, 5)
+                    .map(item => ({
+                        type: 'product_general',
+                        title: item.title,
+                        link: item.link,
+                        snippet: `Price: ${item.price} on ${item.source}`,
+                    }));
+                return generalAlternatives.length > 0 ? generalAlternatives : null;
+            }
         }
         return null;
 

@@ -63,11 +63,14 @@ export async function getGeminiResponse(product, messages, alternatives) {
 
     let context_prompt = `Here is the item context: Name: ${product.name}, Price: $${product.price.toFixed(2)}.`;
     if(alternatives && alternatives.length > 0) {
-        const isDeal = alternatives[0].isDeal;
-        if (isDeal) {
-            const alt_text = alternatives.map(alt => `- ${alt.title} from ${alt.source} for ${alt.price}`).join('\n');
-            context_prompt += `\n\nHere are some cheaper alternatives I found. Use them to challenge the user:\n${alt_text}`;
-        } else {
+        const alt_type = alternatives[0].type;
+        if (alt_type === 'product_cheaper') {
+            const alt_text = alternatives.map(alt => `- ${alt.title} - ${alt.snippet}`).join('\n');
+            context_prompt += `\n\nHere are some verifiably cheaper alternatives I found. Use them to challenge the user:\n${alt_text}`;
+        } else if (alt_type === 'product_general') {
+            const alt_text = alternatives.map(alt => `- ${alt.title} - ${alt.snippet}`).join('\n');
+            context_prompt += `\n\nI couldn't find any cheaper items, but here are some other alternatives. Mention these as other options:\n${alt_text}`;
+        } else if (alt_type === 'deal') {
             const alt_text = alternatives.map(alt => `- "${alt.title}" - ${alt.snippet}`).join('\n');
             context_prompt += `\n\nHere are some potential sitewide deals or coupons I found. Mention these to the user:\n${alt_text}`;
         }

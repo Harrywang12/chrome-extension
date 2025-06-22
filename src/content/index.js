@@ -10,7 +10,144 @@ let isProceedingAfterWin = false;
 
 // --- UI CREATION ---
 
-function createModal(product, firstMessage, alternatives) {
+function createAlternativesPanel(alternatives) {
+    const panelId = 'cartwatch-alternatives-panel-container';
+    if (document.getElementById(panelId) || !alternatives || alternatives.length === 0) return;
+
+    const panelWrapper = document.createElement('div');
+    panelWrapper.id = panelId;
+    panelWrapper.style.position = 'fixed';
+    panelWrapper.style.top = '120px'; // Give some space from the top
+    panelWrapper.style.right = '24px';
+    panelWrapper.style.width = '350px';
+    panelWrapper.style.zIndex = '2147483645'; // Just under the modal
+    
+    const shadow = panelWrapper.attachShadow({ mode: 'open' });
+
+    const hasAlternatives = alternatives && alternatives.length > 0;
+    if (!hasAlternatives) return;
+
+    const alternativeType = alternatives[0].type;
+    let panelTitle = "Alternatives";
+    let panelSubtitle = "Similar Products on Amazon";
+
+    if (alternativeType === 'product_cheaper') {
+        panelTitle = "Cheaper Alternatives";
+    } else if (alternativeType === 'product_general') {
+        panelTitle = "Product Alternatives";
+    } else if (alternativeType === 'deal') {
+        panelTitle = "Coupons & Deals";
+        panelSubtitle = "Found via Web Search";
+    }
+    
+    shadow.innerHTML = `
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+            :host {
+                --surface-color: #ffffff;
+                --primary-background: #f7f8fc;
+                --primary-text: #1a1a1a;
+                --secondary-text: #5c5f6e;
+                --accent-primary: #4f46e5;
+                --border-color: #e5e7eb;
+                --shadow-color: rgba(79, 70, 229, 0.1);
+                --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            }
+            @keyframes fade-in-up-panel {
+                from { opacity: 0; transform: translateY(15px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+           .alternatives-panel {
+                width: 100%;
+                height: 620px;
+                max-height: 75vh;
+                background: var(--surface-color);
+                border-radius: 20px;
+                box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                color: var(--primary-text);
+                font-family: var(--font-primary);
+                border: 1px solid var(--border-color);
+                animation: fade-in-up-panel 0.4s ease-out forwards;
+            }
+            .alternatives-panel header {
+                padding: 24px;
+                border-bottom: 1px solid var(--border-color);
+                background-color: var(--surface-color);
+            }
+            .alternatives-panel h3 {
+                margin: 0 0 4px;
+                font-size: 20px;
+                font-weight: 700;
+                color: var(--primary-text);
+            }
+             .alternatives-panel p {
+                 margin: 0;
+                 font-size: 14px;
+                 color: var(--secondary-text);
+             }
+            .alternatives-panel ul {
+                list-style: none;
+                padding: 16px;
+                margin: 0;
+                overflow-y: auto;
+                flex-grow: 1;
+            }
+            .alternatives-panel li {
+                margin-bottom: 12px;
+            }
+            .alternatives-panel li a {
+                display: block;
+                padding: 16px;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                text-decoration: none;
+                color: var(--primary-text);
+                background: var(--surface-color);
+                transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+            }
+            .alternatives-panel li a:hover {
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                transform: translateY(-2px);
+                border-color: var(--accent-primary);
+            }
+            .alt-title {
+                font-size: 16px;
+                font-weight: 600;
+                color: var(--accent-primary);
+                display: block;
+                margin-bottom: 8px;
+            }
+            .alt-snippet {
+                font-size: 14px;
+                line-height: 1.5;
+                color: var(--secondary-text);
+                margin: 0;
+            }
+        </style>
+        <div class="alternatives-panel">
+             <header>
+                <h3>${panelTitle}</h3>
+                <p>${panelSubtitle}</p>
+            </header>
+            <ul>
+                ${alternatives.map(alt => `
+                    <li>
+                        <a href="${alt.link}" target="_blank" rel="noopener noreferrer">
+                            <strong class="alt-title">${alt.title}</strong>
+                            <p class="alt-snippet">${alt.snippet}</p>
+                        </a>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    `;
+    document.body.appendChild(panelWrapper);
+}
+
+function createModal(product, firstMessage) {
     const modalId = 'cartwatch-modal-container';
     if (document.getElementById(modalId)) return;
 
@@ -19,33 +156,7 @@ function createModal(product, firstMessage, alternatives) {
     const shadow = modalWrapper.attachShadow({ mode: 'open' });
 
     let alternativesHTML = '';
-    const hasAlternatives = alternatives && alternatives.length > 0;
     
-    if (hasAlternatives) {
-        const alternativeType = alternatives[0].type;
-        const panelTitle = alternativeType === 'product' ? "Cheaper Alternatives" : "Coupons & Deals";
-        const panelSubtitle = alternativeType === 'product' ? "Similar Products on Amazon" : "Found via Web Search";
-
-        alternativesHTML = `
-            <div class="alternatives-panel">
-                <header>
-                    <h3>${panelTitle}</h3>
-                    <p>${panelSubtitle}</p>
-                </header>
-                <ul>
-                    ${alternatives.map(alt => `
-                        <li>
-                            <a href="${alt.link}" target="_blank" rel="noopener noreferrer">
-                                <strong class="alt-title">${alt.title}</strong>
-                                <p class="alt-snippet">${alt.snippet}</p>
-                            </a>
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-        `;
-    }
-
     shadow.innerHTML = `
         <style>/* --- Modern & Premium UI Overhaul --- */
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -241,91 +352,7 @@ function createModal(product, firstMessage, alternatives) {
 
             /* --- Alternatives Panel --- */
             .alternatives-panel {
-                width: 340px;
-                height: 620px;
-                max-height: 85vh;
-                background: var(--primary-background);
-                border-radius: 20px;
-                box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                color: var(--primary-text);
-                font-family: var(--font-primary);
-                border: 1px solid var(--border-color);
-                animation: fade-in-up 0.4s ease-out 0.1s forwards;
-                opacity: 0; /* Start hidden for staggered animation */
-            }
-            .alternatives-panel header {
-                padding: 24px;
-                border-bottom: 1px solid var(--border-color);
-                background-color: var(--surface-color);
-            }
-            .alternatives-panel h3 {
-                margin: 0 0 4px;
-                font-size: 20px;
-                font-weight: 700;
-                color: var(--primary-text);
-            }
-             .alternatives-panel p {
-                 margin: 0;
-                 font-size: 14px;
-                 color: var(--secondary-text);
-             }
-            .alternatives-panel ul {
-                list-style: none;
-                padding: 16px;
-                margin: 0;
-                overflow-y: auto;
-                flex-grow: 1;
-            }
-            .alternatives-panel li {
-                margin-bottom: 12px;
-            }
-            .alternatives-panel li a {
-                display: block;
-                padding: 16px;
-                border: 1px solid var(--border-color);
-                border-radius: 12px;
-                text-decoration: none;
-                color: var(--primary-text);
-                background: var(--surface-color);
-                transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
-            }
-            .alternatives-panel li a:hover {
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-                transform: translateY(-2px);
-                border-color: var(--accent-primary);
-            }
-            .alt-title {
-                font-size: 16px;
-                font-weight: 600;
-                color: var(--accent-primary);
-                display: block;
-                margin-bottom: 8px;
-            }
-            .alt-snippet {
-                font-size: 14px;
-                line-height: 1.5;
-                color: var(--secondary-text);
-                margin: 0;
-            }
-            .deal-info {
-                display: none; /* No longer used, but kept for future reference */
-            }
-            .alt-price {
-                font-size: 18px;
-                font-weight: 700;
-                color: var(--success-color);
-            }
-            .alt-source {
-                font-size: 12px;
-                font-weight: 500;
-                color: var(--secondary-text);
-                background: var(--primary-background);
-                padding: 4px 8px;
-                border-radius: 6px;
-                border: 1px solid var(--border-color);
+                display: none; /* This is now a separate component */
             }
         </style>
         <div class="backdrop">
@@ -347,7 +374,6 @@ function createModal(product, firstMessage, alternatives) {
                         </div>
                     </footer>
                 </div>
-                ${alternativesHTML}
             </div>
         </div>
     `;
@@ -481,7 +507,9 @@ function triggerDebate(priceInfo, isButtonClick) {
         }
 
         if (response.action === 'debate') {
-            createModal(response.product, response.firstMessage, response.alternatives);
+            createModal(response.product, response.firstMessage);
+            // Also ensure the alternatives panel is visible
+            createAlternativesPanel(response.alternatives);
         } else if (response.action === 'proceed' && isButtonClick) {
             // If the purchase is approved and was triggered by a button, click it.
             window.lastClickedButton?.click();
@@ -709,6 +737,7 @@ function extractTotalPrice() {
     return { name: `your total purchase`, price: parseFloat(finalPrice.replace(/,/g, '')) || 0 };
 }
 
+let initialScanDone = false;
 const observedElements = new Set();
 function scanAndAttachListeners() {
     purchaseSelectors.forEach(selector => {
@@ -731,18 +760,46 @@ function scanAndAttachListeners() {
     });
 }
 
+function handlePageLoadForAlternatives() {
+    // Check if we are on a product page, not a cart or checkout page.
+    const isProductPage = document.getElementById("productTitle") && !checkoutUrlPatterns.some(p => window.location.href.includes(p));
+    
+    if (isProductPage) {
+        const priceInfo = extractItemPrice(document.body);
+        
+        // Only fetch for items over a certain value to avoid being noisy.
+        if (priceInfo && priceInfo.price > 20) {
+            console.log("CartWatch: Product page detected. Fetching alternatives...");
+            chrome.runtime.sendMessage({ type: 'GET_ALTERNATIVES', product: priceInfo }, response => {
+                 if (chrome.runtime.lastError) {
+                    console.error("CartWatch Error:", chrome.runtime.lastError.message);
+                    return;
+                }
+                if (response && response.alternatives) {
+                    createAlternativesPanel(response.alternatives);
+                }
+            });
+        }
+    }
+}
+
 // Use MutationObserver for instant detection of changes
 const observer = new MutationObserver((mutations) => {
     // We can debounce this if it becomes too noisy, but for now, direct is fine.
     scanAndAttachListeners();
     checkUrlForCheckout();
+
+    if (!initialScanDone) {
+        handlePageLoadForAlternatives();
+        initialScanDone = true;
+    }
 });
+
+// Initial listeners scan
+scanAndAttachListeners();
+handlePageLoadForAlternatives(); // Also run on initial script execution
 
 observer.observe(document.body, {
     childList: true,
     subtree: true
 });
-
-// Initial scan
-scanAndAttachListeners();
-checkUrlForCheckout();

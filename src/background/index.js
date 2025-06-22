@@ -27,6 +27,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'PURCHASE_ATTEMPT':
             handlePurchaseAttempt(message, sender, sendResponse);
             break;
+        case 'GET_ALTERNATIVES':
+            handleGetAlternatives(message, sender, sendResponse);
+            break;
         case 'USER_MESSAGE':
             handleUserMessage(message, sender, sendResponse);
             break;
@@ -38,6 +41,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // --- Message Handlers ---
+
+async function handleGetAlternatives(message, sender, sendResponse) {
+    const { product } = message;
+    const { tab } = sender;
+    const url = new URL(tab.url);
+    const hostname = url.hostname;
+
+    console.log(`Searching for cheaper product alternatives on ${hostname} for item priced at $${product.price}`);
+    const alternatives = await getCheaperProductAlternatives(product.name, product.price, hostname);
+    
+    sendResponse({ alternatives: alternatives });
+}
 
 async function handlePurchaseAttempt(message, sender, sendResponse) {
     const { product } = message;
