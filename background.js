@@ -134,81 +134,115 @@ async function getAIResponse(history) {
   }
 }
 
-// This function generates recommendations for cheaper alternatives
-async function generateRecommendations(product) {
-  if (!API_KEY || API_KEY === "YOUR_GROQ_API_KEY_HERE") {
-    return [
-      {
-        title: "Generic Alternative",
-        description: "Consider looking for a generic or store-brand version of this item.",
-        price: "Lower price",
-        savings: "Varies"
-      },
-      {
-        title: "Wait for Sale",
-        description: "This item might go on sale soon. Consider waiting or setting up price alerts.",
-        price: "Sale price",
-        savings: "20-50%"
-      },
-      {
-        title: "Check Other Stores",
-        description: "Compare prices at other retailers like Walmart, Target, or local stores.",
-        price: "Varies",
-        savings: "10-30%"
-      }
-    ];
+async function searchForAlternatives(productName) {
+  const SERPER_KEY = CONFIG.SERPER_API_KEY;
+  if (!SERPER_KEY || SERPER_KEY === "YOUR_SERPER_SEARCH_API_KEY_HERE") {
+    console.log("Serper API key is not set. Skipping web search.");
+    return null;
   }
+
+  const query = `cheaper alternative for "${productName}"`;
+  const url = `https://google.serper.dev/search`;
   
-  const prompt = `A user is considering buying "${product.name}" for ${product.price}. Generate 3-4 specific, actionable recommendations for cheaper alternatives or money-saving strategies. 
-
-For each recommendation, provide:
-1. A specific title (e.g., "Generic Brand Alternative", "Wait for Black Friday Sale")
-2. A brief description explaining the recommendation
-3. Estimated price or savings
-4. Any specific actions they can take
-
-Focus on practical, realistic alternatives that would actually save money. Be specific and actionable.
-
-Format your response as a JSON array with objects containing: title, description, price, savings (optional), link (optional).`;
+  console.log("Performing web search for alternatives with Serper API...");
 
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
+        "X-API-KEY": SERPER_KEY,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: "llama3-70b-8192",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify({ q: query })
     });
 
     if (!response.ok) {
-      console.error("Groq API Error:", response.status, response.statusText);
-      return getDefaultRecommendations();
+      console.error("Serper API Error:", response.status, response.statusText);
+      return null;
     }
 
     const data = await response.json();
-    const recommendationsText = data.choices[0].message.content.trim();
-    
-    try {
-      // Try to parse JSON from the response
-      const recommendations = JSON.parse(recommendationsText);
-      console.log("Generated recommendations:", recommendations);
-      return recommendations;
-    } catch (parseError) {
-      console.error("Error parsing recommendations JSON:", parseError);
-      console.log("Raw response:", recommendationsText);
-      return getDefaultRecommendations();
-    }
-
+    console.log("Serper API Results:", data.organic);
+    // Map the Serper result format to what our LLM prompt expects
+    return data.organic.map(result => ({
+      title: result.title,
+      url: result.link,
+      description: result.snippet
+    }));
   } catch (error) {
-    console.error("Error calling Groq API for recommendations:", error);
-    return getDefaultRecommendations();
+    console.error("Error calling Serper API:", error);
+    return null;
   }
+}
+
+// This function generates recommendations for cheaper alternatives
+async function generateRecommendations(product) {
+  // First, try to get recommendations from a web search
+  const searchResults = await searchForAlternatives(product.name);
+
+  if (searchResults && searchResults.length > 0) {
+    console.log("Web search successful. Asking LLM to process results...");
+    
+    // Format search results for the prompt
+    const searchResultsText = searchResults
+      .slice(0, 5) // Use top 5 results to keep prompt concise
+      .map(r => `Title: ${r.title}\nURL: ${r.url}\nDescription: ${r.description}`)
+      .join('\n\n---\n\n');
+
+    const prompt = `A user is considering buying "${product.name}" for ${product.price}.
+I have performed a web search and found these potential alternatives:
+
+---
+${searchResultsText}
+---
+
+Your task is to analyze these search results and extract the top 3 most relevant and cheapest alternatives. For each alternative, provide a JSON object with the following fields:
+
+1.  "title": A clean, concise title for the alternative product.
+2.  "description": A short, compelling one-sentence summary explaining why this is a good alternative. Be direct and focus on the benefit (e.g., "A similar model with great reviews for a lower price.").
+3.  "price": The price of the alternative, if you can find it in the search result. If not, use "Price Varies".
+4.  "link": The direct URL from the search result.
+5.  "type": Classify the recommendation into one of these categories: "brand" (a different brand), "store" (same item, different store), "model" (a cheaper model from the same brand), or "generic" (a generic or store-brand version).
+
+Your final output must be a single, valid JSON array of these objects, and nothing else. If the search results are not relevant or don't offer good alternatives, return an empty array [].`;
+
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${CONFIG.GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama3-70b-8192",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1000,
+          temperature: 0.2,
+          // Use response_format to ensure we get valid JSON
+          response_format: { type: "json_object" }, 
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Groq API Error while processing search results:", response.status, response.statusText);
+        return getDefaultRecommendations(); // Fallback
+      }
+
+      const data = await response.json();
+      // The content will be a JSON string, which needs to be parsed.
+      const content = JSON.parse(data.choices[0].message.content);
+      // The actual array is often nested, e.g., under a "recommendations" key.
+      const recommendations = content.recommendations || content.alternatives || content;
+      
+      if (Array.isArray(recommendations) && recommendations.length > 0) {
+        console.log("Successfully generated recommendations from web search:", recommendations);
+        return recommendations;
+      }
+    } catch (error) {
+      console.error("Error processing search results with LLM:", error);
+    }
+  }
+  
+  // Fallback to default recommendations if web search fails or returns nothing
+  console.log("Falling back to default recommendations.");
+  return getDefaultRecommendations();
 }
 
 // Default recommendations when API fails
@@ -243,12 +277,17 @@ function getDefaultRecommendations() {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const tabId = sender.tab.id;
+  console.log(`Background: Received message of type "${request.type}" from tab ${tabId}`);
 
   if (request.type === "PRODUCT_ADDED") {
     (async () => {
-      console.log("Background: Received product:", request.product.name);
+      console.log("Background: Processing PRODUCT_ADDED for product:", request.product.name);
       
-      if (!(await isEssential(request.product.name))) {
+      const isProductEssential = await isEssential(request.product.name);
+      console.log(`Background: Product is essential? ${isProductEssential}`);
+
+      if (!isProductEssential) {
+        console.log("Background: Product is non-essential. Proceeding to show popup.");
         // Shorten the product name first
         console.log("Background: Shortening product name...");
         const shortenedName = await shortenProductName(request.product.name);
@@ -278,6 +317,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           },
           argument: initialResponse 
         });
+      } else {
+        console.log("Background: Product is essential. No action taken.");
       }
     })();
     return true; // Indicate async response.
@@ -315,8 +356,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "GET_RECOMMENDATIONS") {
     (async () => {
-      console.log("Background: Generating recommendations for:", request.product.name);
+      console.log("Background: Processing GET_RECOMMENDATIONS for:", request.product.name);
       const recommendations = await generateRecommendations(request.product);
+      console.log("Background: Sending recommendations back to content script.");
       sendResponse({ recommendations: recommendations });
     })();
     return true; // Indicate async response.

@@ -136,14 +136,30 @@ document.addEventListener('mousedown', async function(event) {
       try {
         const priceElement = document.querySelector('.a-price, #priceblock_ourprice, .priceToPay, .a-price-whole');
         if (priceElement) {
-          const priceWhole = priceElement.querySelector('.a-price-whole');
-          const priceFraction = priceElement.querySelector('.a-price-fraction');
-          if (priceWhole && priceFraction) {
-            productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
-            numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
-          } else if (priceElement.innerText) {
-            productPrice = priceElement.innerText.trim().replace(/\s+/g, '');
-            numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\d.]/g, ''));
+          const text = priceElement.innerText;
+          const potentialPrices = text.match(/\$?\d{1,3}(?:,?\d{3})*(?:\.\d{1,2})?/g) || [];
+          console.log("Potential prices found in element:", potentialPrices);
+
+          let finalPrice = null;
+          if (potentialPrices.length > 0) {
+            // Priority 1: A price with a dollar sign.
+            finalPrice = potentialPrices.find(p => p.startsWith('$'));
+            // Priority 2: A price with a decimal point.
+            if (!finalPrice) {
+                finalPrice = potentialPrices.find(p => p.includes('.'));
+            }
+            // Priority 3: A plain integer, but only if it's the only number found, to avoid ambiguity.
+            if (!finalPrice && potentialPrices.length === 1) {
+                const singleMatchText = text.toLowerCase();
+                if (!singleMatchText.includes('rating') && !singleMatchText.includes('answered') && !singleMatchText.includes('review')) {
+                    finalPrice = potentialPrices[0];
+                }
+            }
+          }
+
+          if (finalPrice) {
+            productPrice = finalPrice;
+            numericPrice = parseFloat(productPrice.replace(/[^\d.]/g, ''));
           }
         }
       } catch (e) {
@@ -324,8 +340,7 @@ document.addEventListener('mousedown', async function(event) {
                   !/^subscribe & save$/i.test(text) &&
                   !/^free delivery$/i.test(text) &&
                   !/^prime$/i.test(text) &&
-                  !/^in stock$/i.test(text) &&
-                  !/^out of stock$/i.test(text)) {
+                  !/^in stock$/i.test(text)) {
                 productName = text;
                 foundName = true;
                 console.log("Product name extracted:", productName);
@@ -456,16 +471,31 @@ document.addEventListener('mousedown', async function(event) {
           `);
           
           if (priceElement) {
-            const priceWhole = priceElement.querySelector('.a-price-whole');
-            const priceFraction = priceElement.querySelector('.a-price-fraction');
-            if (priceWhole && priceFraction) {
-              productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
-              numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
-            } else if (priceElement.innerText) {
-              productPrice = priceElement.innerText.trim().replace(/\s+/g, '');
-              numericPrice = parseFloat(priceElement.innerText.trim().replace(/[^\d.]/g, ''));
+            const text = priceElement.innerText;
+            const potentialPrices = text.match(/\$?\d{1,3}(?:,?\d{3})*(?:\.\d{1,2})?/g) || [];
+            console.log("Potential prices found in element:", potentialPrices);
+
+            let finalPrice = null;
+            if (potentialPrices.length > 0) {
+              // Priority 1: A price with a dollar sign.
+              finalPrice = potentialPrices.find(p => p.startsWith('$'));
+              // Priority 2: A price with a decimal point.
+              if (!finalPrice) {
+                  finalPrice = potentialPrices.find(p => p.includes('.'));
+              }
+              // Priority 3: A plain integer, but only if it's the only number found, to avoid ambiguity.
+              if (!finalPrice && potentialPrices.length === 1) {
+                  const singleMatchText = text.toLowerCase();
+                  if (!singleMatchText.includes('rating') && !singleMatchText.includes('answered') && !singleMatchText.includes('review')) {
+                      finalPrice = potentialPrices[0];
+                  }
+              }
             }
-            console.log("Product price extracted:", productPrice);
+
+            if (finalPrice) {
+              productPrice = finalPrice;
+              numericPrice = parseFloat(productPrice.replace(/[^\d.]/g, ''));
+            }
           }
         } else {
           // Fallback: extract from entire page when product card not found
@@ -565,16 +595,28 @@ document.addEventListener('mousedown', async function(event) {
           `);
           
           if (pagePriceElement) {
-            const priceWhole = pagePriceElement.querySelector('.a-price-whole');
-            const priceFraction = pagePriceElement.querySelector('.a-price-fraction');
-            if (priceWhole && priceFraction) {
-              productPrice = `${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`;
-              numericPrice = parseFloat(`${priceWhole.innerText.trim()}.${priceFraction.innerText.trim()}`);
-            } else if (pagePriceElement.innerText) {
-              productPrice = pagePriceElement.innerText.trim().replace(/\s+/g, '');
-              numericPrice = parseFloat(pagePriceElement.innerText.trim().replace(/[^\d.]/g, ''));
+            const text = pagePriceElement.innerText;
+            const potentialPrices = text.match(/\$?\d{1,3}(?:,?\d{3})*(?:\.\d{1,2})?/g) || [];
+            console.log("Potential prices found in element:", potentialPrices);
+
+            let finalPrice = null;
+            if (potentialPrices.length > 0) {
+              finalPrice = potentialPrices.find(p => p.startsWith('$'));
+              if (!finalPrice) {
+                  finalPrice = potentialPrices.find(p => p.includes('.'));
+              }
+              if (!finalPrice && potentialPrices.length === 1) {
+                  const singleMatchText = text.toLowerCase();
+                  if (!singleMatchText.includes('rating') && !singleMatchText.includes('answered') && !singleMatchText.includes('review')) {
+                      finalPrice = potentialPrices[0];
+                  }
+              }
             }
-            console.log("Product price from page-wide search:", productPrice);
+
+            if (finalPrice) {
+              productPrice = finalPrice;
+              numericPrice = parseFloat(productPrice.replace(/[^\d.]/g, ''));
+            }
           }
         }
       } catch (e) {
@@ -641,97 +683,384 @@ function showAIPopup(product, initialArgument) {
 
   const style = document.createElement('style');
   style.innerHTML = `
-    #impulse-control-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; max-width: 90vw; background-color: white; border: 1px solid #ccc; box-shadow: 0 5px 15px rgba(0,0,0,0.3); border-radius: 8px; z-index: 10000; font-family: sans-serif; display: flex; flex-direction: column; height: 500px; }
-    #impulse-control-popup-content { padding: 0; display: flex; flex-direction: column; height: 100%; }
-    #impulse-control-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 10px 20px; flex-shrink: 0; }
-    #impulse-control-header h2 { margin: 0; font-size: 1.25rem; }
-    #impulse-control-close-btn { border: none; background: transparent; font-size: 1.5rem; cursor: pointer; }
+    /* Modern CSS Reset and Base Styles */
+    * {
+      box-sizing: border-box;
+    }
     
-    /* New Overlay Style */
-    #impulse-control-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 9999; }
+    /* Main Popup Container */
+    #impulse-control-popup { 
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      width: 480px; 
+      max-width: 90vw; 
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      border-radius: 20px; 
+      z-index: 10000; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+      display: flex; 
+      flex-direction: column; 
+      height: 600px;
+      backdrop-filter: blur(20px);
+      animation: popupSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes popupSlideIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+    
+    #impulse-control-popup-content { 
+      padding: 0; 
+      display: flex; 
+      flex-direction: column; 
+      height: 100%; 
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    
+    /* Header */
+    #impulse-control-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid #e2e8f0; 
+      padding: 24px 32px; 
+      flex-shrink: 0; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    #impulse-control-header h2 { 
+      margin: 0; 
+      font-size: 1.5rem; 
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    
+    #impulse-control-close-btn { 
+      border: none; 
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 1.5rem; 
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+    
+    #impulse-control-close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
+    }
+    
+    /* Overlay */
+    #impulse-control-overlay { 
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.5) 100%);
+      z-index: 9999;
+      backdrop-filter: blur(8px);
+      animation: overlayFadeIn 0.3s ease;
+    }
+    
+    @keyframes overlayFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
 
-    /* New Chat Area Styles */
-    #ai-chat-area { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
-    .chat-message { margin-bottom: 15px; padding: 8px 12px; border-radius: 18px; max-width: 80%; line-height: 1.4; }
-    .ai-message { background-color: #f1f0f0; align-self: flex-start; }
-    .user-message { background-color: #007bff; color: white; align-self: flex-end; }
+    /* Chat Area */
+    #ai-chat-area { 
+      flex-grow: 1; 
+      padding: 24px 32px; 
+      overflow-y: auto; 
+      display: flex; 
+      flex-direction: column;
+      background: #ffffff;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e0 #f7fafc;
+    }
+    
+    #ai-chat-area::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #ai-chat-area::-webkit-scrollbar-track {
+      background: #f7fafc;
+      border-radius: 3px;
+    }
+    
+    #ai-chat-area::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    #ai-chat-area::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
+    
+    .chat-message { 
+      margin-bottom: 20px; 
+      padding: 16px 20px; 
+      border-radius: 18px; 
+      max-width: 85%; 
+      line-height: 1.6; 
+      font-size: 0.95rem;
+      position: relative;
+      animation: messageSlideIn 0.3s ease;
+      overflow-wrap: break-word;
+    }
+    
+    @keyframes messageSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .ai-message { 
+      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      color: #2d3748;
+      align-self: flex-start;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .user-message { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; 
+      align-self: flex-end;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
     
     /* Prevent line breaks in prices */
-    .chat-message .price { white-space: nowrap; display: inline; color: inherit; }
+    .chat-message .price { 
+      white-space: nowrap; 
+      display: inline; 
+      color: inherit;
+      font-weight: 600;
+    }
     
-    #impulse-control-chat-form { display: flex; border-top: 1px solid #eee; padding: 10px; flex-shrink: 0; }
-    #impulse-control-chat-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 8px 15px; font-size: 1rem; }
-    #impulse-control-chat-form button { background-color: #007bff; color: white; border: none; border-radius: 20px; padding: 8px 15px; margin-left: 10px; cursor: pointer; }
+    /* Chat Form */
+    #impulse-control-chat-form { 
+      display: flex; 
+      border-top: 1px solid #e2e8f0; 
+      padding: 20px 32px; 
+      flex-shrink: 0;
+      background: #f8fafc;
+      gap: 12px;
+    }
+    
+    #impulse-control-chat-input { 
+      flex-grow: 1; 
+      border: 2px solid #e2e8f0; 
+      border-radius: 25px; 
+      padding: 12px 20px; 
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      background: white;
+    }
+    
+    #impulse-control-chat-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    #impulse-control-chat-form button { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; 
+      border: none; 
+      border-radius: 25px; 
+      padding: 12px 24px; 
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 80px;
+    }
+    
+    #impulse-control-chat-form button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
   
     /* Final Action Buttons */
-    #impulse-control-final-actions { display: flex; justify-content: space-between; padding: 10px; border-top: 1px solid #eee; }
-    #impulse-control-final-actions button { padding: 10px 15px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; }
-    #impulse-control-cancel-btn { background-color: #dc3545; color: white; }
-    #impulse-control-proceed-btn { background-color: #28a745; color: white; }
-    #impulse-control-proceed-btn:disabled { background-color: #6c757d; cursor: not-allowed; }
+    #impulse-control-final-actions { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 20px 32px; 
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      gap: 16px;
+    }
+    
+    #impulse-control-final-actions button { 
+      padding: 14px 28px; 
+      border-radius: 12px; 
+      border: none; 
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #impulse-control-cancel-btn { 
+      background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(245, 101, 101, 0.3);
+    }
+    
+    #impulse-control-cancel-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(245, 101, 101, 0.4);
+    }
+    
+    #impulse-control-proceed-btn { 
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+    }
+    
+    #impulse-control-proceed-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(72, 187, 120, 0.4);
+    }
+    
+    #impulse-control-proceed-btn:disabled { 
+      background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
     /* Side Panel Styles */
     #impulse-control-side-panel { 
       position: fixed; 
       top: 0; 
-      right: -400px; 
-      width: 400px; 
+      right: -450px; 
+      width: 450px; 
       height: 100vh; 
-      background-color: white; 
-      box-shadow: -5px 0 15px rgba(0,0,0,0.3); 
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05);
       z-index: 10001; 
-      font-family: sans-serif; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
       display: flex; 
       flex-direction: column; 
-      transition: right 0.3s ease;
+      transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(20px);
     }
     
-    #impulse-control-side-panel.show { right: 0; }
+    #impulse-control-side-panel.show { 
+      right: 0; 
+    }
     
     #side-panel-header { 
       display: flex; 
       justify-content: space-between; 
       align-items: center; 
-      border-bottom: 1px solid #eee; 
-      padding: 15px 20px; 
+      border-bottom: 1px solid #e2e8f0; 
+      padding: 24px 32px; 
       flex-shrink: 0; 
-      background-color: #f8f9fa;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
     }
     
     #side-panel-header h3 { 
       margin: 0; 
-      font-size: 1.1rem; 
-      color: #333;
+      font-size: 1.25rem; 
+      font-weight: 700;
+      letter-spacing: -0.025em;
     }
     
     #side-panel-close-btn { 
       border: none; 
-      background: transparent; 
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
       font-size: 1.5rem; 
-      cursor: pointer; 
-      color: #666;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+    
+    #side-panel-close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
     }
     
     #side-panel-content { 
       flex-grow: 1; 
-      padding: 20px; 
+      padding: 24px 32px; 
       overflow-y: auto;
+      background: #ffffff;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e0 #f7fafc;
+    }
+    
+    #side-panel-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #side-panel-content::-webkit-scrollbar-track {
+      background: #f7fafc;
+      border-radius: 3px;
+    }
+    
+    #side-panel-content::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    #side-panel-content::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
     }
     
     #recommendations-loading {
       text-align: center;
-      padding: 40px 20px;
-      color: #666;
+      padding: 60px 20px;
+      color: #718096;
     }
     
     .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #007bff;
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid #667eea;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
+      margin: 0 auto 24px;
     }
     
     @keyframes spin {
@@ -740,60 +1069,88 @@ function showAIPopup(product, initialArgument) {
     }
     
     .recommendation-item {
-      background-color: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
-      transition: all 0.2s ease;
+      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
     }
     
     .recommendation-item:hover {
-      background-color: #e9ecef;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+      border-color: #cbd5e0;
     }
-    
+
+    .recommendation-icon {
+      flex-shrink: 0;
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #e2e8f0 0%, #f7fafc 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #4a5568;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .recommendation-details {
+      flex-grow: 1;
+    }
+
     .recommendation-title {
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 8px;
-      font-size: 1rem;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 12px;
+      font-size: 1.1rem;
+      letter-spacing: -0.025em;
     }
     
     .recommendation-description {
-      color: #666;
-      font-size: 0.9rem;
-      line-height: 1.4;
-      margin-bottom: 10px;
+      color: #4a5568;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    
+    .recommendation-price-container {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 16px;
     }
     
     .recommendation-price {
-      color: #28a745;
-      font-weight: bold;
-      font-size: 1.1rem;
+      margin-bottom: 0;
     }
     
     .recommendation-savings {
-      color: #dc3545;
-      font-size: 0.9rem;
-      font-weight: bold;
+      margin-bottom: 0;
     }
     
     .recommendation-link {
       display: inline-block;
-      background-color: #007bff;
+      background: #fff;
       color: white;
       text-decoration: none;
-      padding: 8px 16px;
-      border-radius: 5px;
+      padding: 10px 20px;
+      border-radius: 8px;
       font-size: 0.9rem;
-      margin-top: 10px;
-      transition: background-color 0.2s ease;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
     
     .recommendation-link:hover {
-      background-color: #0056b3;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
   `;
 
@@ -1086,10 +1443,19 @@ function extractCoreProductName(fullName) {
     return fullName;
   }
   
-  console.log("Cleaning product name:", fullName);
+  console.log("Cleaning product name (before):", fullName);
+
+  // Add spaces before capital letters and numbers to handle concatenated names
+  let spacedName = fullName
+    .replace(/([a-z])([A-Z])/g, '$1 $2') // CamelCase -> Camel Case
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2') // ALLCAPSWord -> ALLCAPS Word
+    .replace(/([a-zA-Z])(\d)/g, '$1 $2') // Word1 -> Word 1
+    .replace(/(\d)([a-zA-Z])/g, '$1 $2'); // 1Word -> 1 Word
+
+  console.log("Cleaning product name (after spacing):", spacedName);
   
   // Remove common Amazon product description patterns
-  let cleanedName = fullName
+  let cleanedName = spacedName
     // Remove "Pack of X" patterns
     .replace(/\(Pack of \d+\)/gi, '')
     .replace(/Pack of \d+/gi, '')
@@ -1126,7 +1492,7 @@ function extractCoreProductName(fullName) {
     cleanedName = words.slice(0, 4).join(' '); // Take first 4 words max
   }
   
-  console.log("Cleaned product name:", cleanedName);
+  console.log("Cleaned product name (after):", cleanedName);
   return cleanedName;
 }
 
@@ -1159,6 +1525,17 @@ async function loadRecommendations(product) {
   }
 }
 
+// Function to get a relevant icon for a recommendation type
+function getIconForRec(type) {
+    switch (type) {
+        case 'brand': return '🔄'; // A different brand
+        case 'store': return '🏬'; // The same item at a different store
+        case 'model': return '📉'; // A cheaper model from the same brand
+        case 'generic': return '📦'; // A generic or store-brand version
+        default: return '💡'; // A general suggestion
+    }
+}
+
 // Function to display recommendations in the side panel
 function displayRecommendations(recommendations) {
   const loadingDiv = document.getElementById('recommendations-loading');
@@ -1173,11 +1550,16 @@ function displayRecommendations(recommendations) {
       const recItem = document.createElement('div');
       recItem.className = 'recommendation-item';
       recItem.innerHTML = `
-        <div class="recommendation-title">${rec.title}</div>
-        <div class="recommendation-description">${rec.description}</div>
-        <div class="recommendation-price">${rec.price}</div>
-        ${rec.savings ? `<div class="recommendation-savings">Save ${rec.savings}</div>` : ''}
-        ${rec.link ? `<a href="${rec.link}" class="recommendation-link" target="_blank">View Alternative</a>` : ''}
+        <div class="recommendation-icon">${getIconForRec(rec.type)}</div>
+        <div class="recommendation-details">
+          <div class="recommendation-title">${rec.title}</div>
+          <div class="recommendation-description">${rec.description}</div>
+          <div class="recommendation-price-container">
+            <span class="recommendation-price">${rec.price}</span>
+            ${rec.savings ? `<span class="recommendation-savings">Save ${rec.savings}</span>` : ''}
+          </div>
+          ${rec.link ? `<a href="${rec.link}" class="recommendation-link" target="_blank">View Deal</a>` : ''}
+        </div>
       `;
       listDiv.appendChild(recItem);
     });

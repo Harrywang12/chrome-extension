@@ -1,11 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Impulse-Control",
+  "name": "Impulse Control",
   "version": "1.0",
-  "description": "An AI agent to help you control impulse buying.",
+  "description": "An AI assistant to help you curb impulse buying.",
   "permissions": [
+    "storage",
     "activeTab",
-    "storage"
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.groq.com/",
+    "https://google.serper.dev/"
   ],
   "background": {
     "service_worker": "background.js"
@@ -17,6 +22,7 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {}
   }
 } 
